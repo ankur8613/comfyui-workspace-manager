@@ -1,13 +1,8 @@
 import platform
 from aiohttp import web
-import asyncio
-import json
 import os
-import traceback
 import logging
-from threading import Lock
-import server
-import uuid
+import traceback
 from aiohttp.web import FileResponse
 from .setting_service import get_my_workflows_dir
 
@@ -29,7 +24,7 @@ async def scan_my_workflows_files(request):
 @server.PromptServer.instance.routes.get('/workspace/file/download')
 async def download_file(request):
     """
-    Endpoint for downloading a file, no matter the type (including files without extensions).
+    Endpoint for downloading a file, ensuring all file types are supported, including files without extensions.
     """
     reqJson = await request.json()
     file_path = reqJson['file_path']  # Expecting the full path of the file to download
@@ -38,7 +33,7 @@ async def download_file(request):
         return web.Response(text=json.dumps({'error': 'File not found'}), status=404, content_type='application/json')
 
     try:
-        # Return file as a response with the correct headers
+        # Send the file as a download response
         return FileResponse(path=file_path)
 
     except Exception as e:
@@ -76,7 +71,7 @@ def folder_handle(path, recursive, metaInfoOnly, fileList=None):
 
 def file_handle(name, fileList, file_path, metaInfoOnly):
     try:
-        # Handling files without extension and binary/text files
+        # Handle all files without any extension restriction
         createTime, updateTime = getFileCreateTime(file_path)
         fileList.append({
             'name': name,
