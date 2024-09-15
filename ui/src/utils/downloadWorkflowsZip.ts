@@ -7,12 +7,11 @@ import { userSettingsTable } from "../db-tables/WorkspaceDB";
 
 export const downloadWorkflowsZip = async (selectedList: Array<Workflow>) => {
   try {
-    const exportName = `ComfyUI_workspace_workflows_${formatTimestamp(Date.now())}`;
+    const exportName = `ComfyUI_workspace_files_${formatTimestamp(Date.now())}`;
     const zip = new JSZip();
     const twoWaySyncEnabled = await userSettingsTable?.getSetting("twoWaySync");
 
-    // Log the selection for debugging
-    console.log("Selected workflows for zip:", selectedList);
+    console.log("Selected items for zip:", selectedList);
 
     for (const workflow of selectedList) {
       let folderPath;
@@ -21,40 +20,38 @@ export const downloadWorkflowsZip = async (selectedList: Array<Workflow>) => {
           folderPath = workflow.parentFolderID ?? "";
         } else {
           folderPath = await genFolderRelPath(workflow.parentFolderID ?? null)
-            .then(async (path) => {
-              return sanitizeRelPath(path ?? "");
-            })
+            .then(async (path) => sanitizeRelPath(path ?? ""))
             .catch((err) => {
               console.error("Error generating folder path:", err);
               return "";
             });
         }
 
-        // Ensure the folder path exists in the zip
         const folder = zip.folder(folderPath);
-        // Log the folder path for debugging
-        console.log(`Adding workflow to folder: ${folderPath}`);
+        console.log(`Adding files to folder: ${folderPath}`);
 
-        // Adding the JSON file to the corresponding folder
-        if (folder) {
-          folder.file(`${workflow.name}.json`, workflow.json);
-        } else {
-          console.error("Failed to create folder in zip for workflow:", workflow.name);
+        // Example: Add different types of files dynamically
+        for (const file of workflow.files) {  // Assuming `workflow.files` is an array of files with different types
+          const fileType = file.type || "application/octet-stream";  // Default to binary type if not specified
+          const fileContent = await fetchFileContent(file.url);  // Function to fetch the file content
+          
+          // Add the file to the zip folder with its correct name and extension
+          folder?.file(`${file.name}.${file.extension}`, fileContent, { binary: true });
         }
+
       } catch (error) {
         console.error("Error processing workflow:", workflow.name, error);
       }
     }
 
-    // Generate the zip and trigger the download
-    zip.generateAsync({ type: "blob" }).then(function (content) {
+    zip.generateAsync({ type: "blob" }).then((content) => {
       const a = document.createElement("a");
       a.href = window.URL.createObjectURL(content);
       a.download = `${exportName}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(a.href); // Clean up
+      URL.revokeObjectURL(a.href);  // Clean up
       console.log("Download initiated for zip file:", exportName);
     }).catch((error) => {
       console.error("Error generating zip file:", error);
@@ -64,3 +61,10 @@ export const downloadWorkflowsZip = async (selectedList: Array<Workflow>) => {
     console.error("Error in downloadWorkflowsZip:", error);
   }
 };
+
+// Utility function to fetch the file content based on URL (this will depend on your implementation)
+async function fetchFileContent(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch file content from ${url}`);
+  return await response.blob();  // Returns the file content as a Blob
+}
